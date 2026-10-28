@@ -1,0 +1,15 @@
+services:
+  toolbox:
+    image: ghcr.io/lukas20039/toolbox:latest
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      MAX_UPLOAD_MB: 200
+      MAX_MEDIA_DURATION_MIN: 180
+      MAX_CONCURRENT_JOBS: 2
+      # ALLOWED_MEDIA_HOSTS: youtube.com,youtu.be,vimeo.com
+      # ENABLE_URL_DOWNLOAD: "false"
+    tmpfs:
+      - /tmp:size=4g,mode=1777
+    restart: unless-stopped

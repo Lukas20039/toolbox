@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nützliche Tools</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --border: #2a2f3a; --text: #e6e8ee;
+    --muted: #8b93a7; --accent: #5b9dff; --ok: #3ecf8e; --err: #ff6b6b;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f6fa; --card: #fff; --border: #dde2ea; --text: #1a1d24; --muted: #5f6878; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 28px 24px 12px; max-width: 1300px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  header p { margin: 0 0 16px; color: var(--muted); }
+  #search { width: 100%; max-width: 420px; }
+  main { max-width: 1300px; margin: 0 auto; padding: 12px 24px 48px; display: grid; gap: 16px;
+         grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+  .tool { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .tool h2 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .tool .desc { margin: 0; color: var(--muted); font-size: 13px; }
+  textarea, input, select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  textarea { min-height: 90px; resize: vertical; }
+  input[type=color] { padding: 2px; height: 38px; }
+  input[type=range] { padding: 0; }
+  input[type=checkbox] { width: auto; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1; }
+  .row > button, .row > label { flex: 0 0 auto; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button:hover { filter: brightness(1.1); }
+  .out { background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px;
+    font: 13px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; min-height: 20px; }
+  .err { color: var(--err); }
+  .ok { color: var(--ok); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stats div { background: var(--bg); border-radius: 8px; padding: 8px; text-align: center; }
+  .stats b { display: block; font-size: 18px; }
+  .stats span { color: var(--muted); font-size: 12px; }
+  .swatch { height: 38px; border-radius: 8px; border: 1px solid var(--border); }
+  mark { background: #ffd33d66; color: inherit; border-radius: 2px; }
+  label { font-size: 13px; color: var(--muted); }
+  .hidden { display: none; }
+  .section-title { max-width: 1300px; margin: 16px auto 0; padding: 0 24px; font-size: 18px; color: var(--muted); font-weight: 600; }
+  .notice { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--err); border-radius: 12px; padding: 12px 16px; }
+  form { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+  input[type=file] { font-family: inherit; }
+  .result:empty { display: none; }
+  .result { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  progress { width: 100%; height: 8px; accent-color: var(--accent); }
+  a.download { color: var(--ok); font-weight: 600; word-break: break-all; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ok); color: #000;
+    padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧰 Nützliche Tools</h1>
+  <p>Datei-Konverter laufen auf diesem Server, Werkzeuge direkt im Browser. Hochgeladene Dateien werden nach spätestens einer Stunde gelöscht.</p>
+  <input id="search" type="search" placeholder="Tool suchen…">
+</header>
+
+<h2 class="section-title">Datei-Konverter</h2>
+<main id="server-tools">
+  <div class="notice hidden" id="server-offline">⚠️ Server-Funktionen sind nicht erreichbar – nur die Browser-Werkzeuge unten funktionieren.</div>
+
+  <section class="tool" data-keywords="youtube video audio mp3 mp4 download url vimeo soundcloud">
+    <h2>▶️ YouTube → MP3 / MP4</h2>
+    <p class="desc">Video oder Audio von YouTube, Vimeo, SoundCloud &amp; Co. herunterladen.</p>
+    <form data-endpoint="/api/media/download" data-job data-testid="media-download">
+      <input name="url" type="url" required placeholder="https://www.youtube.com/watch?v=…">
+      <div class="row">
+        <select name="format">
+          <option value="mp3">MP3 (Audio)</option>
+          <option value="m4a">M4A (Audio)</option>
+          <option value="opus">Opus (Audio)</option>
+          <option value="wav">WAV (Audio)</option>
+          <option value="flac">FLAC (Audio)</option>
+          <option value="mp4">MP4 (Video)</option>
+          <option value="webm">WebM (Video)</option>
+        </select>
+        <select name="quality" title="Maximale Videoauflösung">
+          <option value="2160">2160p</option><option value="1440">1440p</option>
+          <option value="1080" selected>1080p</option><option value="720">720p</option>
+          <option value="480">480p</option><option value="360">360p</option>
+        </select>
+      </div>
+      <button type="submit">Herunterladen</button>
+    </form>
+    <p class="hint" id="allowed-hosts"></p>
+    <p class="hint">Nur Inhalte herunterladen, an denen du die Rechte hast oder deren Lizenz das erlaubt.</p>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="video audio konvertieren mp3 mp4 wav gif webm ogg flac convert">
+    <h2>🎬 Audio / Video konvertieren</h2>
+    <p class="desc">z. B. MP4 → MP3, MOV → MP4, Video → GIF.</p>
+    <form data-endpoint="/api/media/convert" data-job data-testid="media-convert">
+      <input name="file" type="file" required accept="audio/*,video/*">
+      <select name="format">
+        <option value="mp3">MP3</option><option value="m4a">M4A</option><option value="wav">WAV</option>
+        <option value="ogg">OGG</option><option value="opus">Opus</option><option value="flac">FLAC</option>
+        <option value="mp4">MP4 (H.264)</option><option value="webm">WebM (VP9)</option><option value="gif">GIF</option>
+      </select>
+      <button type="submit">Konvertieren</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf zusammenführen merge kombinieren">
+    <h2>📚 PDFs zusammenführen</h2>
+    <p class="desc">Mehrere PDFs in der gewählten Reihenfolge zu einer Datei.</p>
+    <form data-endpoint="/api/pdf/merge" data-testid="pdf-merge">
+      <input name="files" type="file" required multiple accept=".pdf,application/pdf">
+      <button type="submit">Zusammenführen</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf teilen split seiten extrahieren">
+    <h2>✂️ PDF teilen / Seiten extrahieren</h2>
+    <p class="desc">Leer lassen = jede Seite einzeln (ZIP). Sonst z. B. <code>1-3,5,8-</code>.</p>
+    <form data-endpoint="/api/pdf/split" data-testid="pdf-split">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <input name="ranges" placeholder="Seiten (optional), z. B. 1-3,5">
+      <button type="submit">Teilen</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf komprimieren verkleinern compress">
+    <h2>🗜️ PDF komprimieren</h2>
+    <p class="desc">Dateigröße reduzieren.</p>
+    <form data-endpoint="/api/pdf/compress" data-testid="pdf-compress">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <select name="level">
+        <option value="screen">Stark (72 dpi)</option>
+        <option value="ebook" selected>Mittel (150 dpi)</option>
+        <option value="printer">Leicht (300 dpi)</option>
+      </select>
+      <button type="submit">Komprimieren</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf drehen rotieren rotate">
+    <h2>🔄 PDF drehen</h2>
+    <p class="desc">Alle oder ausgewählte Seiten drehen.</p>
+    <form data-endpoint="/api/pdf/rotate" data-testid="pdf-rotate">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <div class="row">
+        <select name="angle"><option value="90">90° rechts</option><option value="180">180°</option><option value="270">90° links</option></select>
+        <input name="ranges" placeholder="Seiten (optional)">
+      </div>
+      <button type="submit">Drehen</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf passwort schützen verschlüsseln protect encrypt">
+    <h2>🔒 PDF mit Passwort schützen</h2>
+    <p class="desc">AES-256-Verschlüsselung.</p>
+    <form data-endpoint="/api/pdf/protect" data-testid="pdf-protect">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <input name="password" type="password" required placeholder="Passwort" autocomplete="new-password">
+      <button type="submit">Schützen</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf entsperren passwort entfernen unlock decrypt">
+    <h2>🔓 PDF entsperren</h2>
+    <p class="desc">Passwortschutz entfernen (Passwort muss bekannt sein).</p>
+    <form data-endpoint="/api/pdf/unlock" data-testid="pdf-unlock">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <input name="password" type="password" placeholder="Passwort" autocomplete="off">
+      <button type="submit">Entsperren</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf bilder png jpg to image">
+    <h2>🖼️ PDF → Bilder</h2>
+    <p class="desc">Jede Seite als PNG oder JPG (mehrere Seiten als ZIP).</p>
+    <form data-endpoint="/api/pdf/to-images" data-testid="pdf-to-images">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <div class="row">
+        <select name="format"><option value="png">PNG</option><option value="jpg">JPG</option></select>
+        <select name="dpi"><option value="72">72 dpi</option><option value="150" selected>150 dpi</option><option value="300">300 dpi</option></select>
+      </div>
+      <button type="submit">Umwandeln</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="pdf text extrahieren txt to text">
+    <h2>📃 PDF → Text</h2>
+    <p class="desc">Text aus PDFs extrahieren (keine OCR).</p>
+    <form data-endpoint="/api/pdf/to-text" data-testid="pdf-to-text">
+      <input name="file" type="file" required accept=".pdf,application/pdf">
+      <button type="submit">Extrahieren</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="bilder pdf jpg png to pdf image">
+    <h2>📸 Bilder → PDF</h2>
+    <p class="desc">Ein Bild pro Seite, in Auswahlreihenfolge.</p>
+    <form data-endpoint="/api/pdf/from-images" data-testid="pdf-from-images">
+      <input name="files" type="file" required multiple accept="image/*">
+      <button type="submit">PDF erstellen</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="word excel powerpoint office docx xlsx pptx odt pdf">
+    <h2>📝 Word / Excel / PowerPoint → PDF</h2>
+    <p class="desc">DOCX, XLSX, PPTX, ODT, RTF, TXT, … über LibreOffice.</p>
+    <form data-endpoint="/api/pdf/from-office" data-testid="pdf-from-office">
+      <input name="file" type="file" required accept=".doc,.docx,.odt,.rtf,.txt,.xls,.xlsx,.ods,.csv,.ppt,.pptx,.odp,.html">
+      <button type="submit">In PDF umwandeln</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <section class="tool" data-keywords="bild konvertieren png jpg webp ico gif resize größe ändern image">
+    <h2>🌄 Bild konvertieren &amp; skalieren</h2>
+    <p class="desc">PNG, JPG, WebP, GIF, BMP, TIFF, ICO. Breite oder Höhe leer = Seitenverhältnis behalten.</p>
+    <form data-endpoint="/api/image/convert" data-testid="image-convert">
+      <input name="file" type="file" required accept="image/*">
+      <div class="row">
+        <select name="format">
+          <option value="png">PNG</option><option value="jpg">JPG</option><option value="webp">WebP</option>
+          <option value="gif">GIF</option><option value="bmp">BMP</option><option value="tiff">TIFF</option><option value="ico">ICO</option>
+        </select>
+        <input name="width" type="number" min="1" max="10000" placeholder="Breite">
+        <input name="height" type="number" min="1" max="10000" placeholder="Höhe">
+      </div>
+      <button type="submit">Konvertieren</button>
+    </form>
+    <div class="result"></div>
+  </section>
+</main>
+
+<h2 class="section-title">Werkzeuge im Browser</h2>
+<main id="client-tools">
+  <!-- JSON -->
+  <section class="tool" data-keywords="json format validate pretty minify">
+    <h2>🧾 JSON Formatter</h2>
+    <p class="desc">Formatieren, minifizieren und validieren.</p>
+    <textarea id="json-in" placeholder='{"hallo":"welt"}'></textarea>
+    <div class="row">
+      <button onclick="jsonFmt(2)">Formatieren</button>
+      <button class="secondary" onclick="jsonFmt(0)">Minify</button>
+      <button class="secondary" onclick="copy('json-out')">Kopieren</button>
+    </div>
+    <div class="out" id="json-out"></div>
+  </section>
+
+  <!-- Base64 -->
+  <section class="tool" data-keywords="base64 encode decode">
+    <h2>🔤 Base64</h2>
+    <p class="desc">Text kodieren / dekodieren (UTF-8).</p>
+    <textarea id="b64-in"></textarea>
+    <div class="row">
+      <button onclick="b64(true)">Encode</button>
+      <button class="secondary" onclick="b64(false)">Decode</button>
+      <button class="secondary" onclick="copy('b64-out')">Kopieren</button>
+    </div>
+    <div class="out" id="b64-out"></div>
+  </section>
+
+  <!-- URL -->
+  <section class="tool" data-keywords="url encode decode percent query">
+    <h2>🔗 URL Encode / Decode</h2>
+    <p class="desc">Prozent-Kodierung für URLs und Query-Parameter.</p>
+    <textarea id="url-in"></textarea>
+    <div class="row">
+      <button onclick="urlc(true)">Encode</button>
+      <button class="secondary" onclick="urlc(false)">Decode</button>
+      <button class="secondary" onclick="copy('url-out')">Kopieren</button>
+    </div>
+    <div class="out" id="url-out"></div>
+  </section>
+
+  <!-- Hash -->
+  <section class="tool" data-keywords="hash sha sha256 sha1 sha512 checksum">
+    <h2>#️⃣ Hash Generator</h2>
+    <p class="desc">SHA-1, SHA-256, SHA-384, SHA-512 – live.</p>
+    <textarea id="hash-in" oninput="hashAll()"></textarea>
+    <div class="out" id="hash-out"></div>
+  </section>
+
+  <!-- UUID -->
+  <section class="tool" data-keywords="uuid guid random id">
+    <h2>🆔 UUID Generator</h2>
+    <p class="desc">Zufällige UUIDs (v4).</p>
+    <div class="row">
+      <input id="uuid-n" type="number" value="5" min="1" max="500">
+      <label><input type="checkbox" id="uuid-up"> GROSS</label>
+      <button onclick="uuids()">Erzeugen</button>
+      <button class="secondary" onclick="copy('uuid-out')">Kopieren</button>
+    </div>
+    <div class="out" id="uuid-out"></div>
+  </section>
+
+  <!-- Password -->
+  <section class="tool" data-keywords="passwort password generator sicher random">
+    <h2>🔐 Passwort-Generator</h2>
+    <p class="desc">Kryptografisch sichere Passwörter.</p>
+    <div class="row">
+      <label>Länge: <b id="pw-len-v">20</b></label>
+      <input id="pw-len" type="range" min="6" max="64" value="20" oninput="pwGen()">
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="pw-up" checked onchange="pwGen()"> A-Z</label>
+      <label><input type="checkbox" id="pw-low" checked onchange="pwGen()"> a-z</label>
+      <label><input type="checkbox" id="pw-num" checked onchange="pwGen()"> 0-9</label>
+      <label><input type="checkbox" id="pw-sym" checked onchange="pwGen()"> !@#</label>
+    </div>
+    <div class="row">
+      <button onclick="pwGen()">Neu</button>
+      <button class="secondary" onclick="copy('pw-out')">Kopieren</button>
+    </div>
+    <div class="out" id="pw-out"></div>
+  </section>
+
+  <!-- Timestamp -->
+  <section class="tool" data-keywords="timestamp unix epoch datum zeit date time">
+    <h2>⏱️ Unix-Timestamp</h2>
+    <p class="desc">Timestamp ↔ Datum. Sekunden oder Millisekunden.</p>
+    <div class="row">
+      <input id="ts-in" placeholder="z.B. 1735689600">
+      <button onclick="tsConv()">Umrechnen</button>
+      <button class="secondary" onclick="tsNow()">Jetzt</button>
+    </div>
+    <input id="dt-in" type="datetime-local" onchange="dtConv()">
+    <div class="out" id="ts-out"></div>
+  </section>
+
+  <!-- Text stats -->
+  <section class="tool" data-keywords="text zähler wörter zeichen count words characters">
+    <h2>📝 Text-Zähler</h2>
+    <p class="desc">Zeichen, Wörter, Zeilen und Lesezeit.</p>
+    <textarea id="txt-in" oninput="txtStats()"></textarea>
+    <div class="stats">
+      <div><b id="st-chars">0</b><span>Zeichen</span></div>
+      <div><b id="st-words">0</b><span>Wörter</span></div>
+      <div><b id="st-lines">0</b><span>Zeilen</span></div>
+      <div><b id="st-nows">0</b><span>ohne Leerz.</span></div>
+      <div><b id="st-bytes">0</b><span>Bytes (UTF-8)</span></div>
+      <div><b id="st-read">0 min</b><span>Lesezeit</span></div>
+    </div>
+  </section>
+
+  <!-- Case -->
+  <section class="tool" data-keywords="case groß klein camel snake kebab text umwandeln">
+    <h2>🔠 Text umwandeln</h2>
+    <p class="desc">Groß/klein, camelCase, snake_case, kebab-case, …</p>
+    <textarea id="case-in"></textarea>
+    <select id="case-mode" onchange="caseConv()">
+      <option value="upper">GROSSBUCHSTABEN</option>
+      <option value="lower">kleinbuchstaben</option>
+      <option value="title">Title Case</option>
+      <option value="camel">camelCase</option>
+      <option value="pascal">PascalCase</option>
+      <option value="snake">snake_case</option>
+      <option value="kebab">kebab-case</option>
+      <option value="const">CONSTANT_CASE</option>
+      <option value="slug">url-slug</option>
+      <option value="reverse">rückwärts</option>
+    </select>
+    <div class="row">
+      <button onclick="caseConv()">Umwandeln</button>
+      <button class="secondary" onclick="copy('case-out')">Kopieren</button>
+    </div>
+    <div class="out" id="case-out"></div>
+  </section>
+
+  <!-- Regex -->
+  <section class="tool" data-keywords="regex regulär ausdruck test match">
+    <h2>🧪 Regex-Tester</h2>
+    <p class="desc">Treffer live hervorheben.</p>
+    <div class="row">
+      <input id="re-pat" placeholder="Muster, z.B. \d+" oninput="reTest()">
+      <input id="re-flags" value="g" style="max-width:70px" oninput="reTest()">
+    </div>
+    <textarea id="re-in" oninput="reTest()" placeholder="Testtext…"></textarea>
+    <div class="out" id="re-out"></div>
+  </section>
+
+  <!-- Color -->
+  <section class="tool" data-keywords="farbe color hex rgb hsl">
+    <h2>🎨 Farb-Konverter</h2>
+    <p class="desc">HEX ↔ RGB ↔ HSL.</p>
+    <div class="row">
+      <input id="col-pick" type="color" value="#5b9dff" oninput="colFrom(this.value)" style="max-width:60px">
+      <input id="col-in" value="#5b9dff" oninput="colFrom(this.value)" placeholder="#hex oder rgb(…)">
+    </div>
+    <div class="swatch" id="col-sw"></div>
+    <div class="out" id="col-out"></div>
+  </section>
+
+  <!-- Number base -->
+  <section class="tool" data-keywords="zahl basis binär hex oktal dezimal number base binary">
+    <h2>🔢 Zahlensysteme</h2>
+    <p class="desc">Dezimal, Hex, Binär, Oktal.</p>
+    <div class="row">
+      <input id="nb-in" placeholder="z.B. 255, 0xff, 0b1010" oninput="nbConv()">
+    </div>
+    <div class="out" id="nb-out"></div>
+  </section>
+
+  <!-- Units / percent -->
+  <section class="tool" data-keywords="prozent rechner percent">
+    <h2>💯 Prozentrechner</h2>
+    <p class="desc">Die üblichen Prozentfragen.</p>
+    <div class="row"><input id="p-a" type="number" placeholder="A" oninput="pct()"><input id="p-b" type="number" placeholder="B" oninput="pct()"></div>
+    <div class="out" id="p-out"></div>
+  </section>
+
+  <!-- JWT -->
+  <section class="tool" data-keywords="jwt token decode">
+    <h2>🎫 JWT Decoder</h2>
+    <p class="desc">Header & Payload anzeigen (ohne Signaturprüfung).</p>
+    <textarea id="jwt-in" oninput="jwtDec()" placeholder="eyJhbGciOi…"></textarea>
+    <div class="out" id="jwt-out"></div>
+  </section>
+
+  <!-- Diff -->
+  <section class="tool" data-keywords="diff vergleich compare text">
+    <h2>↔️ Text-Vergleich</h2>
+    <p class="desc">Zeilenweiser Vergleich zweier Texte.</p>
+    <div class="row">
+      <textarea id="diff-a" placeholder="Text A"></textarea>
+      <textarea id="diff-b" placeholder="Text B"></textarea>
+    </div>
+    <button onclick="diff()">Vergleichen</button>
+    <div class="out" id="diff-out"></div>
+  </section>
+
+  <!-- Lorem -->
+  <section class="tool" data-keywords="lorem ipsum blindtext platzhalter">
+    <h2>📄 Lorem Ipsum</h2>
+    <p class="desc">Blindtext erzeugen.</p>
+    <div class="row">
+      <input id="lo-n" type="number" value="3" min="1" max="50">
+      <label>Absätze</label>
+      <button onclick="lorem()">Erzeugen</button>
+      <button class="secondary" onclick="copy('lo-out')">Kopieren</button>
+    </div>
+    <div class="out" id="lo-out"></div>
+  </section>
+</main>
+
+<div id="toast">Kopiert ✓</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const setOut = (id, text, isErr) => { const el = $(id); el.textContent = text; el.classList.toggle('err', !!isErr); };
+
+function copy(id) {
+  navigator.clipboard.writeText($(id).textContent).then(() => {
+    const t = $('toast'); t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1200);
+  });
+}
+
+// Suche
+$('search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase().trim();
+  document.querySelectorAll('.tool').forEach(t => {
+    const hay = (t.querySelector('h2').textContent + ' ' + t.dataset.keywords).toLowerCase();
+    t.classList.toggle('hidden', q && !hay.includes(q));
+  });
+});
+
+// JSON
+function jsonFmt(indent) {
+  try { setOut('json-out', JSON.stringify(JSON.parse($('json-in').value), null, indent)); }
+  catch (e) { setOut('json-out', '❌ ' + e.message, true); }
+}
+
+// Base64
+function b64(enc) {
+  const v = $('b64-in').value;
+  try {
+    if (enc) setOut('b64-out', btoa(String.fromCharCode(...new TextEncoder().encode(v))));
+    else setOut('b64-out', new TextDecoder().decode(Uint8Array.from(atob(v.trim()), c => c.charCodeAt(0))));
+  } catch (e) { setOut('b64-out', '❌ Ungültige Eingabe', true); }
+}
+
+// URL
+function urlc(enc) {
+  try { setOut('url-out', enc ? encodeURIComponent($('url-in').value) : decodeURIComponent($('url-in').value.replace(/\+/g, ' '))); }
+  catch (e) { setOut('url-out', '❌ ' + e.message, true); }
+}
+
+// Hash
+async function hashAll() {
+  const data = new TextEncoder().encode($('hash-in').value);
+  const lines = [];
+  for (const alg of ['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512']) {
+    const buf = await crypto.subtle.digest(alg, data);
+    lines.push(alg + ':\n' + [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join(''));
+  }
+  setOut('hash-out', lines.join('\n\n'));
+}
+
+// UUID
+function uuids() {
+  const n = Math.min(500, Math.max(1, +$('uuid-n').value || 1));
+  let list = Array.from({ length: n }, () => crypto.randomUUID());
+  if ($('uuid-up').checked) list = list.map(u => u.toUpperCase());
+  setOut('uuid-out', list.join('\n'));
+}
+
+// Passwort
+function pwGen() {
+  const len = +$('pw-len').value; $('pw-len-v').textContent = len;
+  let set = '';
+  if ($('pw-up').checked) set += 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  if ($('pw-low').checked) set += 'abcdefghijkmnopqrstuvwxyz';
+  if ($('pw-num').checked) set += '23456789';
+  if ($('pw-sym').checked) set += '!@#$%^&*()-_=+[]{};:,.?';
+  if (!set) return setOut('pw-out', 'Mindestens eine Zeichenart wählen', true);
+  const rnd = crypto.getRandomValues(new Uint32Array(len));
+  setOut('pw-out', [...rnd].map(r => set[r % set.length]).join(''));
+}
+
+// Timestamp
+function fmtDate(d) {
+  return `Lokal: ${d.toLocaleString('de-AT')}\nUTC:   ${d.toISOString()}\nSek.:  ${Math.floor(d / 1000)}\nMs:    ${+d}`;
+}
+function tsConv() {
+  const v = $('ts-in').value.trim();
+  if (!/^-?\d+$/.test(v)) return setOut('ts-out', '❌ Nur Ziffern erlaubt', true);
+  const n = +v; const d = new Date(v.length > 11 ? n : n * 1000);
+  setOut('ts-out', fmtDate(d));
+}
+function tsNow() { const d = new Date(); $('ts-in').value = Math.floor(d / 1000); setOut('ts-out', fmtDate(d)); }
+function dtConv() { const d = new Date($('dt-in').value); if (!isNaN(d)) { $('ts-in').value = Math.floor(d / 1000); setOut('ts-out', fmtDate(d)); } }
+
+// Text-Zähler
+function txtStats() {
+  const v = $('txt-in').value;
+  const words = (v.match(/\S+/g) || []).length;
+  $('st-chars').textContent = [...v].length;
+  $('st-words').textContent = words;
+  $('st-lines').textContent = v ? v.split('\n').length : 0;
+  $('st-nows').textContent = v.replace(/\s/g, '').length;
+  $('st-bytes').textContent = new TextEncoder().encode(v).length;
+  $('st-read').textContent = Math.ceil(words / 200) + ' min';
+}
+
+// Case
+function caseConv() {
+  const v = $('case-in').value;
+  const words = v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9ÄÖÜäöüß]+/).filter(Boolean);
+  const cap = w => w[0].toUpperCase() + w.slice(1).toLowerCase();
+  const map = {
+    upper: () => v.toUpperCase(),
+    lower: () => v.toLowerCase(),
+    title: () => v.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()),
+    camel: () => words.map((w, i) => i ? cap(w) : w.toLowerCase()).join(''),
+    pascal: () => words.map(cap).join(''),
+    snake: () => words.map(w => w.toLowerCase()).join('_'),
+    kebab: () => words.map(w => w.toLowerCase()).join('-'),
+    const: () => words.map(w => w.toUpperCase()).join('_'),
+    slug: () => v.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+                 .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    reverse: () => [...v].reverse().join(''),
+  };
+  setOut('case-out', map[$('case-mode').value]());
+}
+
+// Regex
+function reTest() {
+  const pat = $('re-pat').value, txt = $('re-in').value, out = $('re-out');
+  out.classList.remove('err');
+  if (!pat) { out.textContent = ''; return; }
+  try {
+    let flags = $('re-flags').value; if (!flags.includes('g')) flags += 'g';
+    const re = new RegExp(pat, flags);
+    let html = '', last = 0, count = 0;
+    for (const m of txt.matchAll(re)) {
+      if (m[0] === '' ) continue;
+      html += esc(txt.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+      last = m.index + m[0].length; count++;
+    }
+    html += esc(txt.slice(last));
+    out.innerHTML = `<span class="ok">${count} Treffer</span>\n` + html;
+  } catch (e) { setOut('re-out', '❌ ' + e.message, true); }
+}
+
+// Farbe
+function colFrom(v) {
+  v = v.trim(); let r, g, b, m;
+  if ((m = v.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i))) {
+    let h = m[1]; if (h.length === 3) h = [...h].map(c => c + c).join('');
+    [r, g, b] = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16));
+  } else if ((m = v.match(/rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/i))) {
+    [r, g, b] = [m[1], m[2], m[3]].map(Number);
+  } else return setOut('col-out', '❌ Format: #rrggbb oder rgb(r,g,b)', true);
+  const hex = '#' + [r, g, b].map(x => Math.min(255, x).toString(16).padStart(2, '0')).join('');
+  const [h, s, l] = rgbToHsl(r, g, b);
+  $('col-sw').style.background = hex; $('col-pick').value = hex;
+  setOut('col-out', `HEX: ${hex}\nRGB: rgb(${r}, ${g}, ${b})\nHSL: hsl(${h}, ${s}%, ${l}%)`);
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b); let h = 0, s = 0; const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min; s = l > .5 ? d / (2 - max - min) : d / (max + min);
+    h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6;
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+// Zahlensysteme
+function nbConv() {
+  const v = $('nb-in').value.trim().toLowerCase().replace(/_/g, '');
+  if (!v) return setOut('nb-out', '');
+  try {
+    let n;
+    if (/^0x[0-9a-f]+$/.test(v) || /^0b[01]+$/.test(v) || /^0o[0-7]+$/.test(v)) n = BigInt(v);
+    else if (/^-?\d+$/.test(v)) n = BigInt(v);
+    else throw 0;
+    setOut('nb-out', `Dez: ${n.toString(10)}\nHex: 0x${n.toString(16)}\nBin: 0b${n.toString(2)}\nOkt: 0o${n.toString(8)}`);
+  } catch { setOut('nb-out', '❌ Ungültige Zahl', true); }
+}
+
+// Prozent
+function pct() {
+  const a = parseFloat($('p-a').value), b = parseFloat($('p-b').value);
+  if (isNaN(a) || isNaN(b)) return setOut('p-out', '');
+  const f = x => (Math.round(x * 10000) / 10000).toLocaleString('de-AT');
+  setOut('p-out',
+    `${f(a)} % von ${f(b)} = ${f(a * b / 100)}\n` +
+    `${f(a)} ist ${f(a / b * 100)} % von ${f(b)}\n` +
+    `Änderung ${f(a)} → ${f(b)}: ${b >= a ? '+' : ''}${f((b - a) / a * 100)} %\n` +
+    `${f(b)} + ${f(a)} % = ${f(b * (1 + a / 100))}\n` +
+    `${f(b)} − ${f(a)} % = ${f(b * (1 - a / 100))}`);
+}
+
+// JWT
+function jwtDec() {
+  const parts = $('jwt-in').value.trim().split('.');
+  if (parts.length < 2) return setOut('jwt-out', '');
+  try {
+    const dec = p => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));
+    const h = dec(parts[0]), p = dec(parts[1]);
+    let extra = '';
+    for (const k of ['iat', 'nbf', 'exp']) if (p[k]) extra += `\n${k}: ${new Date(p[k] * 1000).toLocaleString('de-AT')}`;
+    if (p.exp) extra += p.exp * 1000 < Date.now() ? '\n⚠️ Abgelaufen' : '\n✅ Noch gültig';
+    setOut('jwt-out', 'HEADER\n' + JSON.stringify(h, null, 2) + '\n\nPAYLOAD\n' + JSON.stringify(p, null, 2) + extra);
+  } catch { setOut('jwt-out', '❌ Ungültiges JWT', true); }
+}
+
+// Diff (LCS, zeilenweise)
+function diff() {
+  const a = $('diff-a').value.split('\n'), b = $('diff-b').value.split('\n');
+  const n = a.length, m = b.length;
+  if (n * m > 4e6) return setOut('diff-out', '❌ Texte zu groß', true);
+  const L = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0, html = '';
+  const line = (c, s, col) => html += `<span style="color:${col}">${c} ${esc(s)}</span>\n`;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { line(' ', a[i], 'inherit'); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) line('-', a[i++], 'var(--err)');
+    else line('+', b[j++], 'var(--ok)');
+  }
+  while (i < n) line('-', a[i++], 'var(--err)');
+  while (j < m) line('+', b[j++], 'var(--ok)');
+  $('diff-out').classList.remove('err');
+  $('diff-out').innerHTML = html;
+}
+
+// Lorem
+function lorem() {
+  const w = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum'.split(' ');
+  const r = k => Math.floor(Math.random() * k);
+  const sentence = () => { const s = Array.from({ length: 6 + r(10) }, () => w[r(w.length)]).join(' '); return s[0].toUpperCase() + s.slice(1) + '.'; };
+  const n = Math.min(50, Math.max(1, +$('lo-n').value || 1));
+  setOut('lo-out', Array.from({ length: n }, () => Array.from({ length: 4 + r(4) }, sentence).join(' ')).join('\n\n'));
+}
+
+// Server-Konverter
+function filenameFrom(res, fallback) {
+  const cd = res.headers.get('Content-Disposition') || '';
+  const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (star) return decodeURIComponent(star[1]);
+  const plain = cd.match(/filename="?([^";]+)"?/i);
+  return plain ? plain[1] : fallback;
+}
+async function errorText(res) {
+  try {
+    const body = await res.json();
+    if (typeof body.detail === 'string') return body.detail;
+    if (Array.isArray(body.detail)) return body.detail.map(d => `${d.loc?.at(-1)}: ${d.msg}`).join(', ');
+  } catch {}
+  return `Fehler ${res.status}`;
+}
+function showDownload(result, href, name) {
+  result.innerHTML = '';
+  const a = document.createElement('a');
+  a.className = 'download'; a.href = href; a.download = name; a.textContent = '⬇ ' + name;
+  a.dataset.testid = 'download-link';
+  result.append(a);
+  a.click();
+}
+function showError(result, msg) {
+  result.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'err'; div.dataset.testid = 'error'; div.textContent = '❌ ' + msg;
+  result.append(div);
+}
+async function pollJob(id, result) {
+  result.innerHTML = '<progress max="100" value="0"></progress><span class="status">Warte…</span>';
+  const bar = result.querySelector('progress'), status = result.querySelector('.status');
+  for (;;) {
+    await new Promise(r => setTimeout(r, 800));
+    const res = await fetch(`/api/jobs/${id}`);
+    if (!res.ok) throw new Error(await errorText(res));
+    const job = await res.json();
+    bar.value = job.progress;
+    status.textContent = `${job.message || job.status} ${Math.round(job.progress)} %`;
+    if (job.status === 'done') return showDownload(result, `/api/jobs/${id}/file`, job.filename);
+    if (job.status === 'error') return showError(result, job.message);
+  }
+}
+document.querySelectorAll('form[data-endpoint]').forEach(form => {
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const result = form.parentElement.querySelector('.result');
+    const btn = form.querySelector('button[type=submit]');
+    const data = new FormData(form);
+    for (const [k, v] of [...data.entries()]) if (v === '') data.delete(k);
+    btn.disabled = true;
+    result.innerHTML = '<progress></progress><span>Lade hoch…</span>';
+    try {
+      const res = await fetch(form.dataset.endpoint, { method: 'POST', body: data });
+      if (!res.ok) return showError(result, await errorText(res));
+      if ('job' in form.dataset) await pollJob((await res.json()).id, result);
+      else showDownload(result, URL.createObjectURL(await res.blob()), filenameFrom(res, 'ergebnis'));
+    } catch (err) {
+      showError(result, err.message || 'Netzwerkfehler');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
+fetch('/api/config').then(r => r.ok ? r.json() : Promise.reject()).then(cfg => {
+  $('allowed-hosts').textContent = cfg.urlDownload
+    ? 'Erlaubte Seiten: ' + (cfg.allowedMediaHosts.includes('*') ? 'alle' : cfg.allowedMediaHosts.join(', '))
+    : 'URL-Downloads sind auf diesem Server deaktiviert.';
+}).catch(() => {
+  $('server-offline').classList.remove('hidden');
+  document.querySelectorAll('form[data-endpoint] button').forEach(b => b.disabled = true);
+});
+
+// Initialwerte
+pwGen(); uuids(); hashAll(); colFrom('#5b9dff');
+</script>
+</body>
+</html>
