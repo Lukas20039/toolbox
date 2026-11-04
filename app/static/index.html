@@ -28,7 +28,7 @@
   textarea { min-height: 90px; resize: vertical; }
   input[type=color] { padding: 2px; height: 38px; }
   input[type=range] { padding: 0; }
-  input[type=checkbox] { width: auto; }
+  input[type=checkbox], input[type=radio] { width: auto; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .row > * { flex: 1; }
   .row > button, .row > label { flex: 0 0 auto; }
@@ -253,6 +253,43 @@
 
 <h2 class="section-title">Werkzeuge im Browser</h2>
 <main id="client-tools">
+  <!-- Pizzateig -->
+  <section class="tool" data-keywords="pizza teig pizzateig rechner germ hefe hydration napoletana new york dough">
+    <h2>🍕 Pizzateig-Rechner</h2>
+    <p class="desc">Style, Hydration und Teigmenge wählen, der Rest wird berechnet. Ohne Öl.</p>
+    <div class="row">
+      <select id="pz-style" onchange="pizzaStyle()"></select>
+    </div>
+    <div class="row">
+      <label>Teigmenge (g)</label>
+      <input id="pz-total" type="number" value="1000" min="50" step="10" oninput="pizza()">
+    </div>
+    <div class="row">
+      <label>Hydration</label>
+      <input id="pz-hyd" type="range" min="50" max="85" step="1" oninput="pizza()">
+      <b id="pz-hyd-val" style="flex:0 0 3.5em;text-align:right"></b>
+    </div>
+    <p class="hint" id="pz-hint"></p>
+    <div class="row">
+      <label>Gare</label>
+      <select id="pz-ferm" onchange="pizza()">
+        <option value="2">2 h Raumtemperatur</option>
+        <option value="1">4 h Raumtemperatur</option>
+        <option value="0.4">8 h Raumtemperatur</option>
+        <option value="0.25">12 h Raumtemperatur</option>
+        <option value="0.1">24 h Raumtemperatur</option>
+        <option value="0.5">24 h Kühlschrank</option>
+        <option value="0.3">48 h Kühlschrank</option>
+        <option value="0.2">72 h Kühlschrank</option>
+      </select>
+    </div>
+    <div class="row">
+      <label><input type="radio" name="pz-yeast" value="fresh" checked onchange="pizza()"> Frische Germ</label>
+      <label><input type="radio" name="pz-yeast" value="dry" onchange="pizza()"> Trockengerm</label>
+    </div>
+    <div class="out" id="pz-out"></div>
+  </section>
+
   <!-- JSON -->
   <section class="tool" data-keywords="json format validate pretty minify">
     <h2>🧾 JSON Formatter</h2>
@@ -651,6 +688,52 @@ function pct() {
     `${f(b)} + ${f(a)} % = ${f(b * (1 + a / 100))}\n` +
     `${f(b)} − ${f(a)} % = ${f(b * (1 - a / 100))}`);
 }
+
+// Pizzateig (Bäckerprozente: alles relativ zum Mehl; Trockengerm = frische Germ / 3 laut AVPN)
+const PIZZA_STYLES = {
+  napoli:  { name: 'Neapolitanisch (klassisch)',        hyd: 62, min: 58, max: 65, salt: 2.8, sugar: 0,   ferm: '0.25', hint: 'Teiglinge à 200–280 g' },
+  canotto: { name: 'Neapolitanisch Contemporanea',      hyd: 70, min: 67, max: 75, salt: 2.8, sugar: 0,   ferm: '0.5',  hint: 'Teiglinge à 250–280 g, großer luftiger Rand' },
+  ny:      { name: 'New York Style',                    hyd: 62, min: 58, max: 65, salt: 2.0, sugar: 1.5, ferm: '0.3',  hint: '≈ 280 g für 30 cm, ≈ 450 g für 40 cm' },
+  romana:  { name: 'Römisch (tonda, dünn & knusprig)',  hyd: 58, min: 55, max: 62, salt: 2.2, sugar: 0,   ferm: '0.5',  hint: 'Teiglinge à 160–180 g, sehr dünn ausrollen' },
+  teglia:  { name: 'Pizza in Teglia (Blech, römisch)',  hyd: 78, min: 75, max: 85, salt: 2.5, sugar: 0,   ferm: '0.3',  hint: 'Blech 30×40 cm ≈ 700 g' },
+  detroit: { name: 'Detroit Style',                     hyd: 70, min: 65, max: 75, salt: 2.2, sugar: 0,   ferm: '0.5',  hint: 'Form 25×35 cm ≈ 450 g' },
+  sicilia: { name: 'Sizilianisch (Sfincione)',          hyd: 68, min: 65, max: 70, salt: 2.2, sugar: 1.0, ferm: '0.4',  hint: 'Blech 30×40 cm ≈ 900 g, dicker Boden' },
+};
+$('pz-style').innerHTML = Object.entries(PIZZA_STYLES).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('');
+
+function pizzaStyle() {
+  const s = PIZZA_STYLES[$('pz-style').value];
+  $('pz-hyd').value = s.hyd;
+  $('pz-ferm').value = s.ferm;
+  pizza();
+}
+
+function pizza() {
+  const s = PIZZA_STYLES[$('pz-style').value];
+  const total = parseFloat($('pz-total').value), hyd = +$('pz-hyd').value;
+  const dry = document.querySelector('input[name=pz-yeast]:checked').value === 'dry';
+  const yeastPct = +$('pz-ferm').value / (dry ? 3 : 1);
+  $('pz-hyd-val').textContent = hyd + ' %';
+  $('pz-hint').textContent = `Empfohlen für ${s.name}: ${s.min}–${s.max} % Hydration · ${s.hint}`;
+  if (!(total > 0)) return setOut('pz-out', '');
+  const flour = total / (1 + (hyd + s.salt + s.sugar + yeastPct) / 100);
+  const g = (x, d = 0) => x.toLocaleString('de-AT', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const p = x => g(x, x < 1 ? 2 : 1).padStart(6) + ' %';
+  const yeast = flour * yeastPct / 100;
+  const rows = [
+    ['Mehl', g(flour), 100],
+    ['Wasser', g(flour * hyd / 100), hyd],
+    ['Salz', g(flour * s.salt / 100, 1), s.salt],
+    ...(s.sugar ? [['Zucker', g(flour * s.sugar / 100, 1), s.sugar]] : []),
+    [dry ? 'Trockengerm' : 'Frische Germ', g(yeast, yeast < 1 ? 2 : 1), yeastPct],
+  ];
+  const unit = dry ? `${g(yeast / 7, 2)} Packerl à 7 g` : `${g(yeast / 42, 2)} Würfel à 42 g`;
+  setOut('pz-out',
+    rows.map(([n, v, pc]) => `${n.padEnd(13)}${(v + ' g').padStart(9)}  ${p(pc)}`).join('\n') +
+    `\n\n${'Teig gesamt'.padEnd(13)}${(g(total) + ' g').padStart(9)}\nGerm ≈ ${unit}` +
+    (yeast < 1 ? '\nTipp: Kleine Germmengen in etwas vom Wasser auflösen.' : ''));
+}
+pizzaStyle();
 
 // JWT
 function jwtDec() {

@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import expect
 
 
@@ -25,6 +27,36 @@ def test_sha256(page):
     expect(page.locator("#hash-out")).to_contain_text(
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     )
+
+
+def test_pizza_dough_neapolitan_fresh_and_dry_yeast(page):
+    page.goto("/")
+    out = page.locator("#pz-out")
+    # Default: Neapolitanisch, 1000 g, 62 %, 2,8 % Salz, 0,25 % frische Germ
+    expect(out).to_contain_text(re.compile(r"Mehl\s+606 g"))
+    expect(out).to_contain_text(re.compile(r"Wasser\s+376 g"))
+    expect(out).to_contain_text(re.compile(r"Salz\s+17,0 g"))
+    expect(out).to_contain_text(re.compile(r"Frische Germ\s+1,5 g"))
+    expect(out).not_to_contain_text("Öl")
+    page.get_by_label("Trockengerm").check()
+    # Trockengerm = frische Germ / 3
+    expect(out).to_contain_text(re.compile(r"Trockengerm\s+0,51 g"))
+    expect(out).to_contain_text("Packerl à 7 g")
+
+
+def test_pizza_dough_style_hydration_and_amount(page):
+    page.goto("/")
+    page.select_option("#pz-style", "ny")
+    expect(page.locator("#pz-hyd-val")).to_have_text("62 %")
+    expect(page.locator("#pz-out")).to_contain_text("Zucker")
+    page.select_option("#pz-style", "teglia")
+    expect(page.locator("#pz-hyd-val")).to_have_text("78 %")
+    expect(page.locator("#pz-out")).not_to_contain_text("Zucker")
+    page.fill("#pz-total", "500")
+    page.locator("#pz-hyd").fill("70")
+    # 500 / (1 + 0,70 + 0,025 + 0,003) = 289,35 g Mehl
+    expect(page.locator("#pz-out")).to_contain_text(re.compile(r"Mehl\s+289 g"))
+    expect(page.locator("#pz-out")).to_contain_text(re.compile(r"Wasser\s+203 g"))
 
 
 def test_search_filters_tools(page):
