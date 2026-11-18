@@ -1,7 +1,7 @@
 # Deno is required by yt-dlp to solve YouTube's JavaScript challenges.
 FROM denoland/deno:bin-2.9.8 AS deno
 
-FROM python:3.12-slim-trixie
+FROM python:3.15-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
